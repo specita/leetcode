@@ -28,6 +28,21 @@ func CountAndSay(n int) string {
 		return "1"
 	}
 
-	//todo
-	return ""
+	pre := CountAndSay(n - 1)
+	var current = pre[0]
+	var counter byte = 1
+	var result []byte
+	for i := 1; i < len(pre); i++ {
+		if current == pre[i] {
+			counter++
+			continue
+		}
+
+		result = append(result, counter+byte('0'), current)
+		counter = 1
+		current = pre[i]
+	}
+
+	result = append(result, counter+byte('0'), current)
+	return string(result)
 }
