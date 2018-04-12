@@ -1,0 +1,185 @@
+package com.dmall.contract.fee.common.utils;
+
+import java.util.*;
+
+
+public abstract class Matcher<T, S> {
+    protected LinkedList<MatcherHook> hooks;
+    protected List<T> targets;
+    protected LinkedList<S> sours;
+    protected static final int MAX_LOAD = 8;
+
+    public Matcher(List<T> targets, List<S> sources) {
+        this.targets = targets;
+        this.sours = new LinkedList<>();
+        this.initailize(targets, sources);
+    }
+
+
+    private void initailize(List<T> targets, List<S> sources) {
+        sortSources(sources);
+        sortTargets(targets);
+        sours.addAll(sources);
+        hooks = new LinkedList<>();
+        for (T tar : targets) {
+            MatcherHook hook = new MatcherHook(tar);
+            hooks.add(hook);
+        }
+    }
+
+    private void sortSources(List<S> sources) {
+        Collections.sort(sources, new Comparator<S>() {
+            @Override
+            public int compare(S o1, S o2) {
+                double value1 = getSourceValue(o1);
+                double value2 = getSourceValue(o2);
+                if (value1 > value2)
+                    return -1;
+                else if (value1 < value2)
+                    return 1;
+                return 0;
+            }
+        });
+    }
+
+    private void sortTargets(List<T> targets) {
+        Collections.sort(targets, new Comparator<T>() {
+            @Override
+            public int compare(T o1, T o2) {
+                double value1 = getTargetValue(o1);
+                double value2 = getTargetValue(o2);
+                if (value1 > value2)
+                    return -1;
+                else if (value1 < value2)
+                    return 1;
+                return 0;
+            }
+
+        });
+    }
+
+
+    public List<MatcherHook> matches() {
+        this.valueMatches();
+        this.numMatches();
+        return hooks;
+    }
+
+    /**
+     * 如果sours数量足够多，再在钩子补充挂上一些值较小的sour,钩子上挂的最大数量不能超过MAX_LOAD
+     */
+    private void numMatches() {
+        LinkedList<MatcherHook> temp = new LinkedList<>();
+        while (hooks.size() > 0 && hooks.size() < sours.size()) {
+            MatcherHook hook = hooks.peek();
+            if (hook.hookStack.size() >= MAX_LOAD) {
+                temp.add(hooks.poll());
+                continue;
+            }
+            hook.push(sours.pollLast());//从后面去小值
+            resortHooks();
+
+        }
+        hooks.addAll(temp);
+    }
+
+    private void valueMatches() {
+        LinkedList<MatcherHook> temp = new LinkedList<>();
+        while (!sours.isEmpty()) {
+            MatcherHook hook = hooks.peek();
+            if (hook == null) {
+                break;
+            }
+
+            hook.push(sours.pop());
+            if (hook.value <= 0) {
+                temp.add(hooks.poll());
+            }
+            resortHooks();
+        }
+        hooks.addAll(temp);
+        Collections.sort(hooks);
+    }
+
+    private void resortHooks() {
+        for (int i = 0; i < hooks.size() - 1; i++) {
+            MatcherHook h1 = hooks.get(i);
+            MatcherHook h2 = hooks.get(i + 1);
+            //如果当前剩余值小于下一个则下沉
+            if (h1.value < h2.value) {
+                hooks.set(i, h2);
+                hooks.set(i + 1, h1);
+            } else {
+                break;
+            }
+        }
+    }
+
+
+    protected abstract double getSourceValue(S sour);
+
+    protected abstract double getTargetValue(T tar);
+
+    public class MatcherHook implements Comparable<MatcherHook> {
+        private double value;
+        private T target;
+        private Stack<S> hookStack = new Stack<>();
+
+        public double getValue() {
+            return value;
+        }
+
+        public T getTarget() {
+            return target;
+        }
+
+        public List<S> getSources() {
+            return hookStack;
+        }
+
+        private MatcherHook(T target) {
+            this.target = target;
+            this.value = getTargetValue(target);
+        }
+
+        private void push(S sour) {
+            hookStack.push(sour);
+            value = value - getSourceValue(sour);
+        }
+
+        private S pop() {
+            S sour = hookStack.pop();
+            value = value + getSourceValue(sour);
+            return sour;
+        }
+
+        @Override
+        public int compareTo(MatcherHook o) {
+            if (this.value > o.value)
+                return -1;
+            else if (this.value < o.value)
+                return 1;
+            return 0;
+        }
+    }
+
+
+    public static void main(String[] args) {
+        List<Integer> targets = Arrays.asList(60, 70);
+        List<Integer> sources = Arrays.asList(1, 2, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25);
+//        List<Integer> sources = new ArrayList<>();
+        Matcher<Integer, Integer> matcher = new Matcher<Integer, Integer>(targets, sources) {
+            @Override
+            public double getSourceValue(Integer sour) {
+                return sour;
+            }
+
+            @Override
+            public double getTargetValue(Integer tar) {
+                return tar;
+            }
+        };
+        List<Matcher<Integer, Integer>.MatcherHook> hooks = matcher.matches();
+        System.out.println(hooks);
+    }
+}
